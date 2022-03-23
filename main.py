@@ -2,6 +2,7 @@ import random
 import logging
 
 import maya.cmds as cmds
+import json
 
 from PySide2.QtUiTools import QUiLoader
 from PySide2.QtWidgets import *
@@ -55,6 +56,7 @@ class CameraPlaneManager(QObject):
         self.window.imageplane_pb.setIcon(QtGui.QIcon(":fileOpen.png"))
 
 
+
         #connection:
         self.window.imageplane_pb.clicked.connect(self.image_plane_selection)
 
@@ -75,11 +77,12 @@ class CameraPlaneManager(QObject):
         self.window.depth_sb.valueChanged.connect(self.image_plane_depth_sb)
         self.window.depth_slider.sliderMoved.connect(self.image_plane_depth_slider)
 
-        self.window.scalex_sb.valueChanged.connect(self.scalex_sb)
-        self.window.scalex_slider.sliderMoved.connect(self.scalex_slider)
+        self.window.scalex_sb.valueChanged.connect(self.set_scalex_sb)
+        self.window.scalex_slider.sliderMoved.connect(self.set_scalex_slider)
 
-        self.window.scaley_sb.valueChanged.connect(self.scaley_sb)
-        self.window.scaley_slider.sliderMoved.connect(self.scaley_slider)
+        self.window.save_btn.clicked.connect(self.save_file)
+
+        self.window.load_btn.clicked.connect(self.load_file)
 
         self.scene_cameras = select_cameras()
 
@@ -129,8 +132,8 @@ class CameraPlaneManager(QObject):
         item = self.window.listWidget.currentItem()
         if not item:
             return
-        cmds.setAttr(item.text() + ".offsetY", current_value*100)
-        self.window.offsety_slider.setSliderPosition(current_value)
+        cmds.setAttr(item.text() + ".offsetY", current_value)
+        self.window.offsety_slider.setSliderPosition(current_value*100)
 
     # changing the depth of image plane with spinbox
     def image_plane_depth_sb(self, current_value):
@@ -138,7 +141,7 @@ class CameraPlaneManager(QObject):
         if not item:
             return
         cmds.setAttr(item.text() + ".depth", current_value)
-        self.window.offsety_slider.setSliderPosition(current_value)
+        self.window.depth_slider.setSliderPosition(current_value)
 
     # changing the depth of image plane with slider
     def image_plane_depth_slider(self, current_value):
@@ -148,35 +151,19 @@ class CameraPlaneManager(QObject):
         cmds.setAttr(item.text() + ".depth", current_value)
         self.window.depth_sb.setValue(current_value)
 
-    def scalex_sb(self, current_value):
+    def set_scalex_sb(self, current_value):
         item = self.window.listWidget.currentItem()
         if not item:
             return
         cmds.setAttr(item.text() + ".sizeX", current_value)
-        self.window.scalex_slider.setSliderPosition(current_value)
+        self.window.scalex_slider.setSliderPosition(current_value*100)
 
-    def scalex_slider(self, current_value):
+    def set_scalex_slider(self, current_value):
         item = self.window.listWidget.currentItem()
         if not item:
             return
         cmds.setAttr(item.text() + ".sizeX", current_value)
         self.window.scalex_sb.setValue(current_value)
-
-    def scaley_sb(self, current_value):
-        item = self.window.listWidget.currentItem()
-        if not item:
-            return
-        cmds.setAttr(item.text() + ".sizeY", current_value)
-        self.window.scaley_slider.setSliderPosition(current_value)
-
-    def scaley_slider(self, current_value):
-        item = self.window.listWidget.currentItem()
-        if not item:
-            return
-        cmds.setAttr(item.text() + ".sizeY", current_value)
-        self.window.scaley_sb.setValue(current_value)
-
-
 
     def image_plane_lookthrough(self):
         selected_camera = self.window.selectcame_cb.currentText()
@@ -199,6 +186,54 @@ class CameraPlaneManager(QObject):
         logger.warning("{} is deleted".format(selected_camera))
         current_index = self.window.selectcame_cb.currentIndex()
         self.window.selectcame_cb.removeItem(current_index)
+
+    def save_file(self, file_name):
+
+        image_planes = {}
+
+        for index in range(self.window.listWidget.count()):
+            item = self.window.listWidget.item(index)
+            image_plane_name = item.text()
+            image_planes[index] = {"file_path": cmds.getAttr(image_plane_name + ".imageName"),
+                                  "offsetX": cmds.getAttr(image_plane_name + ".offsetX"),
+                                  "offsetY": cmds.getAttr(image_plane_name + ".offsetY"),
+                                  "scale": cmds.getAttr(image_plane_name + ".sizeX"),
+                                  "depth": cmds.getAttr(image_plane_name + ".depth")}
+        file_name = QtWidgets.QFileDialog.getSaveFileName(None, "Save File", "",
+                                                          "JSON (*.json)",
+                                                          )
+        with open(file_name[0], "w") as f:
+            json.dump(image_planes, f, indent=4)
+
+    def load_file(self, file_name):
+
+        file_name = QtWidgets.QFileDialog.getOpenFileName(None, "Select File", "","JSON (*.json)")
+        if file_name[0] == "":
+            return
+        with open(file_name[0], "r") as f:
+            data = json.load(f)
+            print(data)
+        for key, value in data.items():
+            image_plane = create_image_plane(value["file_path"],self.window.selectcame_cb.currentText())
+            cmds.setAttr(image_plane + ".offsetX", value["offsetX"])
+            cmds.setAttr(image_plane + ".offsetY", value["offsetY"])
+            cmds.setAttr(image_plane + ".sizeX", value["scale"])
+            cmds.setAttr(image_plane + ".depth", value["depth"])
+            self.window.listWidget.addItem(image_plane)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def launch():
