@@ -222,20 +222,6 @@ class CameraPlaneManager(QObject):
             self.window.listWidget.addItem(image_plane)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def launch():
     print("launch application")
 
